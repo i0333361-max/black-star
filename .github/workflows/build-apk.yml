@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Set up Java 17 for Android SDK
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -35,18 +35,26 @@ jobs:
         run: |
           mkdir -p source
           unzip -q Black_Star_RP_cloud_build.zip -d source
-          echo "Files extracted:"
+          echo "Extracted files:"
           find source -maxdepth 4 -type f | head -100
-          echo "Gradle wrapper locations:"
+          echo "Searching for Gradle wrapper:"
           find source -name gradlew -type f
+
+      - name: Set up Java 8 for legacy Gradle
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '8'
 
       - name: Build APK
         run: |
           GRADLEW=$(find source -name gradlew -type f | head -1)
+
           if [ -z "$GRADLEW" ]; then
             echo "ERROR: gradlew not found in archive"
             exit 1
           fi
+
           PROJECT_DIR=$(dirname "$GRADLEW")
           cd "$PROJECT_DIR"
           chmod +x gradlew
