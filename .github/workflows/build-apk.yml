@@ -36,15 +36,22 @@ jobs:
           mkdir -p source
           unzip -q Black_Star_RP_cloud_build.zip -d source
 
-          echo "=== Project files ==="
-          find source -maxdepth 4 -type f | head -100
+          echo "=== Gradle files ==="
+          find source -type f \( \
+            -name 'build.gradle' -o \
+            -name 'build.gradle.kts' \
+          \) -print
 
-          echo "=== Gradle files and dependencies ==="
-          find source -type f \( -name 'build.gradle' -o -name 'build.gradle.kts' \) \
-            -print -exec grep -nE 'MaskedEditText|repositories|jcenter|mavenCentral|google\(\)' {} \; || true
+          echo "=== MaskedEditText references ==="
+          grep -R -n "MaskedEditText" source \
+            --include='*.gradle' \
+            --include='*.gradle.kts' \
+            || true
 
-          echo "=== Gradle wrapper ==="
-          find source -name gradlew -type f
+      - name: Check dependency availability
+        run: |
+          curl -fIL \
+            https://repo.maven.apache.org/maven2/io/github/softmedtanzania/maskededittext/1.0.5/maskededittext-1.0.5.pom
 
       - name: Set up Java 8 for legacy Gradle
         uses: actions/setup-java@v5
