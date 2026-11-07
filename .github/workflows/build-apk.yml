@@ -35,9 +35,15 @@ jobs:
         run: |
           mkdir -p source
           unzip -q Black_Star_RP_cloud_build.zip -d source
-          echo "Extracted files:"
+
+          echo "=== Project files ==="
           find source -maxdepth 4 -type f | head -100
-          echo "Searching for Gradle wrapper:"
+
+          echo "=== Gradle files and dependencies ==="
+          find source -type f \( -name 'build.gradle' -o -name 'build.gradle.kts' \) \
+            -print -exec grep -nE 'MaskedEditText|repositories|jcenter|mavenCentral|google\(\)' {} \; || true
+
+          echo "=== Gradle wrapper ==="
           find source -name gradlew -type f
 
       - name: Set up Java 8 for legacy Gradle
@@ -59,19 +65,12 @@ jobs:
           cd "$PROJECT_DIR"
           chmod +x gradlew
 
-          cat > /tmp/repos.gradle <<'GRADLE'
-          allprojects {
-              repositories {
-                  maven { url 'https://repo.spring.io/libs-milestone' }
-              }
-          }
-          GRADLE
-
-          ./gradlew -I /tmp/repos.gradle assembleDebug --stacktrace
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Black-Star-RP-APK
           path: source/**/build/outputs/apk/**/*.apk
-          if-no-files-found: error
+          if-no-files-found: warn
