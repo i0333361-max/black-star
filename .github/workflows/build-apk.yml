@@ -36,23 +36,27 @@ jobs:
           mkdir -p source
           unzip -q Black_Star_RP_cloud_build.zip -d source
 
-          echo "=== Gradle files ==="
-          find source -type f \( \
-            -name 'build.gradle' -o \
-            -name 'build.gradle.kts' \
-          \) -print
-
-          echo "=== Dependency declaration ==="
+          echo "=== Original dependency ==="
           grep -R -n -i -E 'MaskedEditText|egslava' source \
             --include='*.gradle' \
-            --include='*.gradle.kts' \
-            --include='*.java' \
-            --include='*.kt' || true
+            --include='*.gradle.kts' || true
+
+          echo "=== Replace old dependency coordinates ==="
+          find source -type f -name '*.gradle' -print0 |
+            xargs -0 -r sed -i \
+            's#ru\.egslava:MaskedEditText:1\.0\.5#io.github.softmedtanzania:maskededittext:1.0.5#g'
+
+          find source -type f -name '*.gradle.kts' -print0 |
+            xargs -0 -r sed -i \
+            's#ru\.egslava:MaskedEditText:1\.0\.5#io.github.softmedtanzania:maskededittext:1.0.5#g'
+
+          echo "=== Dependency after replacement ==="
+          grep -R -n -i -E 'MaskedEditText|egslava|maskededittext' source \
+            --include='*.gradle' \
+            --include='*.gradle.kts' || true
 
           echo "=== Existing local libraries ==="
-          find source -type f \( \
-            -name '*.aar' -o -name '*.jar' \
-          \) -print
+          find source -type f \( -name '*.aar' -o -name '*.jar' \) -print
 
       - name: Set up Java 8 for legacy Gradle
         uses: actions/setup-java@v5
@@ -73,7 +77,15 @@ jobs:
           cd "$PROJECT_DIR"
           chmod +x gradlew
 
-          ./gradlew assembleDebug --stacktrace
+          cat > /tmp/add-maven-central.gradle <<'EOF'
+          allprojects {
+              repositories {
+                  mavenCentral()
+              }
+          }
+          EOF
+
+          ./gradlew -I /tmp/add-maven-central.gradle assembleDebug --stacktrace
 
       - name: Upload APK
         if: always()
