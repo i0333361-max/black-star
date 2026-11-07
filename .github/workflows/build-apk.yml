@@ -29,33 +29,49 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          sdkmanager "platforms;android-30" "build-tools;30.0.1"
+          sdkmanager "platforms;android-31" "build-tools;31.0.0"
 
-      - name: Extract Android project
+      - name: Extract and fix Android project
+        shell: bash
         run: |
+          set -e
           mkdir -p source
           unzip -q Black_Star_RP_cloud_build.zip -d source
 
-          echo "=== Original dependency ==="
-          grep -R -n -i -E 'MaskedEditText|egslava' source \
-            --include='*.gradle' \
-            --include='*.gradle.kts' || true
+          echo "=== Original Android SDK settings ==="
+          grep -R -n -E 'compileSdk|compileSdkVersion|targetSdkVersion|targetSdk|minSdkVersion|minSdk' source \
+            --include='build.gradle' \
+            --include='build.gradle.kts' || true
 
-          echo "=== Replace old dependency coordinates ==="
-          find source -type f -name '*.gradle' -print0 |
+          echo "=== Replace old MaskedEditText dependency ==="
+          find source -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 |
             xargs -0 -r sed -i \
             's#ru\.egslava:MaskedEditText:1\.0\.5#io.github.softmedtanzania:maskededittext:1.0.5#g'
 
-          find source -type f -name '*.gradle.kts' -print0 |
+          echo "=== Set compile SDK to 31 ==="
+          find source -type f \( -name 'build.gradle' -o -name 'build.gradle.kts' \) -print0 |
             xargs -0 -r sed -i \
-            's#ru\.egslava:MaskedEditText:1\.0\.5#io.github.softmedtanzania:maskededittext:1.0.5#g'
+            -e 's/compileSdkVersion[[:space:]]\+30/compileSdkVersion 31/g' \
+            -e 's/compileSdk[[:space:]]\+30/compileSdk 31/g' \
+            -e 's/compileSdkVersion[[:space:]]*=[[:space:]]*30/compileSdkVersion = 31/g' \
+            -e 's/compileSdk[[:space:]]*=[[:space:]]*30/compileSdk = 31/g'
 
-          echo "=== Dependency after replacement ==="
-          grep -R -n -i -E 'MaskedEditText|egslava|maskededittext' source \
-            --include='*.gradle' \
-            --include='*.gradle.kts' || true
+          echo "=== Check app compile SDK ==="
+          APP_GRADLE=$(find source -path '*/app/build.gradle' -o -path '*/app/build.gradle.kts' | head -1)
 
-          echo "=== Existing local libraries ==="
+          if [ -z "$APP_GRADLE" ]; then
+            echo "ERROR: app Gradle file not found"
+            exit 1
+          fi
+
+          cat "$APP_GRADLE"
+
+          if ! grep -E 'compileSdk(Version)?[[:space:]]*(=)?[[:space:]]*31' "$APP_GRADLE"; then
+            echo "ERROR: compile SDK 31 was not confirmed in app Gradle file"
+            exit 1
+          fi
+
+          echo "=== Local libraries ==="
           find source -type f \( -name '*.aar' -o -name '*.jar' \) -print
 
       - name: Set up Java 8 for legacy Gradle
@@ -65,7 +81,9 @@ jobs:
           java-version: '8'
 
       - name: Build APK
+        shell: bash
         run: |
+          set -e
           GRADLEW=$(find source -name gradlew -type f | head -1)
 
           if [ -z "$GRADLEW" ]; then
@@ -80,6 +98,7 @@ jobs:
           cat > /tmp/add-maven-central.gradle <<'EOF'
           allprojects {
               repositories {
+                  google()
                   mavenCentral()
               }
           }
